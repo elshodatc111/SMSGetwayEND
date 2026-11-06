@@ -318,7 +318,7 @@ def project_webhook_test(pid: int, request: Request, db: Session = Depends(get_d
 @router.get("/modems", response_class=HTMLResponse)
 def modems_page(request: Request, db: Session = Depends(get_db), _=Depends(require_admin)):
     rt = get_runtime()
-    return render(request, "modems.html", "modems", modems=modem_rows(db), cfg=get_settings(), last_scan=rt.pool.last_scan, note=rt.pool.last_scan_note)
+    return render(request, "modems.html", "modems", modems=modem_rows(db), cfg=get_settings(), last_scan=rt.pool.last_scan, note=rt.pool.last_scan_note, report=dict(rt.pool.port_report))
 
 
 @router.post("/modems/rescan")

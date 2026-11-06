@@ -35,5 +35,18 @@
     </tbody>
   </table></div>
 </div>
+
+{% if report %}
+<div class="card">
+  <h3>Diagnostika (portlar)</h3>
+  <div class="table-wrap"><table>
+    <tbody>
+    {% for port, msg in report.items() %}
+      <tr><td class="mono">{{ port }}</td><td>{{ msg }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
 </div>
 {% endblock %}

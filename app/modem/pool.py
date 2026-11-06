@@ -30,6 +30,7 @@ class ModemPool:
         self._thread: threading.Thread | None = None
         self.last_scan = None
         self.last_scan_note = ""
+        self.port_report: dict[str, str] = {}  # port -> oxirgi tekshiruv natijasi (diagnostika)
         self.heartbeat = 0.0
 
     # ---------- band/bo'sh ----------
@@ -143,6 +144,8 @@ class ModemPool:
         known_ports = {m.port for m in self.modems.values()}
         now = time.monotonic()
         ports = self._candidate_ports()
+        for gone in [p for p in self.port_report if p not in ports]:
+            self.port_report.pop(gone, None)
         notes.append(f"portlar: {', '.join(ports) if ports else 'topilmadi'}")
         for port in ports:
             if port in known_ports or self._bad_ports.get(port, 0) > now:
@@ -152,7 +155,10 @@ class ModemPool:
                 info = modem.probe()
             except Exception as e:
                 self._bad_ports[port] = now + 30
-                log.debug("Port %s modem emas: %s", port, e)
+                msg = f"{type(e).__name__}: {e}"
+                if self.port_report.get(port) != msg:
+                    log.warning("Port %s modem sifatida ochilmadi: %s", port, msg)
+                self.port_report[port] = msg
                 continue
             with self._lock:
                 dup = info.imei in self.modems
@@ -161,7 +167,9 @@ class ModemPool:
             if dup:
                 modem.close()
                 self._bad_ports[port] = now + 600  # shu modemning ikkinchi porti
+                self.port_report[port] = f"Bu modemning ikkinchi porti (IMEI {info.imei}), o'tkazib yuborildi"
             else:
+                self.port_report[port] = f"Modem: IMEI {info.imei}, {info.operator or '?'}"
                 log.info("Modem topildi: %s (%s) %s", info.imei, port, info.operator)
 
         self._sync_db()
