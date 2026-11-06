@@ -561,6 +561,12 @@ def send_submit(
 
 
 # ---------------------------------------------------------------- sozlamalar
+@router.get("/docs", response_class=HTMLResponse)
+def docs_page(request: Request, _=Depends(require_admin)):
+    base = str(request.base_url).rstrip("/")
+    return render(request, "docs.html", "docs", base=base)
+
+
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_db), _=Depends(require_admin)):
     return render(request, "settings.html", "settings", defs=SETTING_DEFS, values=all_settings(db))

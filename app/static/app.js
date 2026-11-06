@@ -14,6 +14,24 @@
     apply(t);
   });
 
+  // Mobil menyu
+  var mt = document.getElementById("menu-toggle"), bd = document.getElementById("backdrop");
+  if (mt) mt.addEventListener("click", function () { document.body.classList.toggle("menu-open"); });
+  if (bd) bd.addEventListener("click", function () { document.body.classList.remove("menu-open"); });
+
+  // Tablar (kod namunalari)
+  document.querySelectorAll(".tabs").forEach(function (bar) {
+    bar.querySelectorAll(".tab").forEach(function (t) {
+      t.addEventListener("click", function () {
+        var scope = bar.parentElement;
+        bar.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
+        scope.querySelectorAll(":scope > .tabpane").forEach(function (x) { x.classList.remove("active"); });
+        t.classList.add("active");
+        scope.querySelector(t.getAttribute("data-pane")).classList.add("active");
+      });
+    });
+  });
+
   // Nusxalash tugmalari
   document.querySelectorAll("[data-copy]").forEach(function (el) {
     el.addEventListener("click", function () {

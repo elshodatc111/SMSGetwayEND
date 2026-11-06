@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}API yo'riqnomasi{% endblock %}
+{% macro code(id) %}<div class="codebox"><button type="button" class="btn small copy" data-copy="#{{ id }}">Nusxa</button><pre class="code" id="{{ id }}">{{ caller() | trim }}</pre></div>{% endmacro %}
+{% block content %}
+<h1>API yo'riqnomasi</h1>
+<div class="doc-grid">
+<div class="doc">
+
+<h2 id="start">1. Tez boshlash</h2>
+<div class="card">
+  <ol style="margin:0;padding-left:20px">
+    <li><a href="/admin/projects">Loyihalar</a> bo'limida loyiha yarating va <b>API kalitni</b> nusxalang (kalit faqat bir marta ko'rsatiladi).</li>
+    <li>Kalitni o'z loyihangizning <code>.env</code> fayliga saqlang. Hech qachon brauzer (frontend) kodiga qo'ymang.</li>
+    <li>Quyidagi so'rov bilan SMS yuboring:</li>
+  </ol>
+  {% call code('c-quick') %}curl -X POST {{ base }}/api/v1/sms/send \
+  -H "Authorization: Bearer sk_sms_SIZNING_KALITINGIZ" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "+998901234567", "text": "Tasdiqlash kodi: 4821"}'{% endcall %}
+  <p class="muted" style="margin:0">Javob <code>202</code> bilan darhol qaytadi: SMS navbatga qo'yildi. Haqiqiy yuborish navbat bo'yicha, har biri orasida belgilangan interval bilan bajariladi.</p>
+</div>
+
+<h2 id="auth">2. Autentifikatsiya</h2>
+<div class="card">
+  <p style="margin-top:0">Har bir so'rovda kalit yuboriladi. Ikki usuldan biri:</p>
+  <table class="kv"><tbody>
+    <tr><td>Authorization: Bearer &lt;kalit&gt;</td><td>tavsiya etiladi</td></tr>
+    <tr><td>X-API-Key: &lt;kalit&gt;</td><td>muqobil</td></tr>
+  </tbody></table>
+  <div class="callout warn">Noto'g'ri kalit bilan bir daqiqada 20 martadan ko'p urinilsa, IP vaqtincha bloklanadi (<code>429</code>).</div>
+  <p class="muted" style="margin-bottom:0">Asosiy manzil: <span class="mono">{{ base }}/api/v1</span></p>
+</div>
+
+<h2 id="send">3. SMS yuborish</h2>
+<div class="card">
+  <p style="margin-top:0"><span class="method post">POST</span><span class="endpoint">/api/v1/sms/send</span></p>
+  <table class="kv">
+    <thead><tr><th>Maydon</th><th>Tur</th><th>Tavsif</th></tr></thead>
+    <tbody>
+      <tr><td>to <span class="badge err">majburiy</span></td><td>string</td><td>Telefon raqam: <code>+998901234567</code> yoki <code>998901234567</code> yoki <code>901234567</code>. Muqobil nomi: <code>phone</code></td></tr>
+      <tr><td>text <span class="badge err">majburiy</span></td><td>string</td><td>SMS matni (1–2000 belgi). Uzun matn avtomatik bir necha qismga bo'linadi. Muqobil nomi: <code>message</code></td></tr>
+      <tr><td>external_id</td><td>string</td><td>Sizning tizimingizdagi ID (maks. 100 belgi). Bir xil <code>external_id</code> bilan qayta so'rov yuborilsa, yangi SMS yaratilmaydi, avvalgisi qaytadi (<code>duplicate: true</code>). Tarmoq uzilganda takror yuborishdan himoya qiladi.</td></tr>
+    </tbody>
+  </table>
+  <h3 style="margin-top:16px">Muvaffaqiyatli javob (202)</h3>
+  {% call code('c-resp') %}{
+  "id": 1042,
+  "external_id": "order-77",
+  "to": "+998901234567",
+  "status": "queued",
+  "parts": 1,
+  "parts_sent": 0,
+  "encoding": "gsm7",
+  "error": null,
+  "created_at": "2026-11-07T02:15:00Z",
+  "sent_at": null,
+  "finished_at": null,
+  "duplicate": false
+}{% endcall %}
+</div>
+
+<h2 id="examples">4. Kod namunalari</h2>
+<div class="card">
+  <div class="tabs">
+    <button class="tab active" data-pane="#t-py">Python</button>
+    <button class="tab" data-pane="#t-php">PHP / Laravel</button>
+    <button class="tab" data-pane="#t-js">Node.js</button>
+    <button class="tab" data-pane="#t-curl">cURL</button>
+  </div>
+  <div class="tabpane active" id="t-py">
+    {% call code('c-py') %}import requests
+
+GATEWAY = "{{ base }}/api/v1"
+API_KEY = "sk_sms_SIZNING_KALITINGIZ"
+
+
+def send_sms(phone: str, text: str, external_id: str | None = None) -> dict:
+    r = requests.post(
+        f"{GATEWAY}/sms/send",
+        headers={"Authorization": f"Bearer {API_KEY}"},
+        json={"to": phone, "text": text, "external_id": external_id},
+        timeout=10,
+    )
+    data = r.json()
+    if not r.ok:
+        err = data["error"]
+        raise RuntimeError(f"{err['code']}: {err['message']}")
+    return data
+
+
+print(send_sms("+998901234567", "Tasdiqlash kodi: 4821", "otp-1001"))
+{% endcall %}
+  </div>
+  <div class="tabpane" id="t-php">
+    {% call code('c-php') %}&lt;?php
+use Illuminate\Support\Facades\Http;
+
+// .env:  SMS_GATEWAY_URL={{ base }}/api/v1
+//        SMS_GATEWAY_KEY=sk_sms_SIZNING_KALITINGIZ
+function sendSms(string $phone, string $text, ?string $externalId = null): array
+{
+    $res = Http::withToken(env('SMS_GATEWAY_KEY'))
+        ->timeout(10)
+        ->post(env('SMS_GATEWAY_URL') . '/sms/send', [
+            'to' => $phone,
+            'text' => $text,
+            'external_id' => $externalId,
+        ]);
+
+    if ($res->failed()) {
+        throw new \RuntimeException($res->json('error.code') . ': ' . $res->json('error.message'));
+    }
+    return $res->json();
+}{% endcall %}
+  </div>
+  <div class="tabpane" id="t-js">
+    {% call code('c-js') %}// Node.js 18+ (fetch o'rnatilgan)
+const GATEWAY = "{{ base }}/api/v1";
+const API_KEY = process.env.SMS_GATEWAY_KEY;
+
+async function sendSms(to, text, externalId) {
+  const res = await fetch(`${GATEWAY}/sms/send`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ to, text, external_id: externalId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`${data.error.code}: ${data.error.message}`);
+  return data;
+}
+
+sendSms("+998901234567", "Tasdiqlash kodi: 4821", "otp-1001").then(console.log);
+{% endcall %}
+  </div>
+  <div class="tabpane" id="t-curl">
+    {% call code('c-curl') %}# SMS yuborish
+curl -X POST {{ base }}/api/v1/sms/send \
+  -H "Authorization: Bearer sk_sms_KALIT" -H "Content-Type: application/json" \
+  -d '{"to":"+998901234567","text":"Salom!","external_id":"test-1"}'
+
+# Holatni tekshirish
+curl {{ base }}/api/v1/sms/1042 -H "Authorization: Bearer sk_sms_KALIT"
+
+# Oxirgi xabarlar (filtr bilan)
+curl "{{ base }}/api/v1/sms?status=failed&limit=20" -H "Authorization: Bearer sk_sms_KALIT"
+
+# Navbatdagini bekor qilish
+curl -X DELETE {{ base }}/api/v1/sms/1042 -H "Authorization: Bearer sk_sms_KALIT"
+
+# Limit va sarfni ko'rish
+curl {{ base }}/api/v1/me/usage -H "Authorization: Bearer sk_sms_KALIT"{% endcall %}
+  </div>
+</div>
+
+<h2 id="status">5. Holatni tekshirish</h2>
+<div class="card">
+  <p style="margin-top:0"><span class="method get">GET</span><span class="endpoint">/api/v1/sms/{id}</span></p>
+  <p>Yuborishda qaytgan <code>id</code> bo'yicha holatni so'rang. OTP kabi tezkor holatlarda har 2–3 soniyada tekshirish yetarli yoki webhook'dan foydalaning (8-bo'lim).</p>
+  <table>
+    <thead><tr><th>status</th><th>Ma'nosi</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge warn">queued</span></td><td>Navbatda, hali yuborilmagan</td></tr>
+      <tr><td><span class="badge info">sending</span></td><td>Modem yuborayapti</td></tr>
+      <tr><td><span class="badge ok">sent</span></td><td>Modem SMS ni operatorga topshirdi (oxirgi holat)</td></tr>
+      <tr><td><span class="badge err">failed</span></td><td>Yuborib bo'lmadi, sababi <code>error</code> maydonida (oxirgi holat)</td></tr>
+      <tr><td><span class="badge err">expired</span></td><td>Navbatda juda uzoq turib qolgani uchun muddati o'tdi (oxirgi holat)</td></tr>
+      <tr><td><span class="badge">cancelled</span></td><td>Bekor qilingan (oxirgi holat)</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">Muhim: <code>sent</code> degani SMS operator tarmog'iga topshirilganini bildiradi. Abonentga yetib borganini tasdiqlamaydi.</div>
+</div>
+
+<h2 id="more">6. Boshqa so'rovlar</h2>
+<div class="card">
+  <table class="kv">
+    <thead><tr><th>So'rov</th><th>Vazifasi</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method get">GET</span>/api/v1/sms</td><td>O'z xabarlaringiz ro'yxati. Filtrlar: <code>external_id</code>, <code>status</code>, <code>limit</code> (1–200, standart 50)</td></tr>
+      <tr><td><span class="method delete">DELETE</span>/api/v1/sms/{id}</td><td>Navbatdagi (<code>queued</code>) xabarni bekor qilish. Boshqa holatda <code>409</code></td></tr>
+      <tr><td><span class="method get">GET</span>/api/v1/me/usage</td><td>Loyihaning bugungi, oylik va jami sarfi hamda limitlari</td></tr>
+      <tr><td><span class="method get">GET</span>/api/v1/health</td><td>Tizim sog'lig'i (kalit talab qilinmaydi). <code>503</code> bo'lsa modem yo'q yoki tizim to'xtagan</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2 id="errors">7. Xatolar</h2>
+<div class="card">
+  <p style="margin-top:0">Xato bo'lsa HTTP kod 4xx/5xx va quyidagi shakldagi JSON qaytadi:</p>
+  {% call code('c-err') %}{ "error": { "code": "invalid_phone", "message": "Telefon raqam noto'g'ri. Format: +998901234567" } }{% endcall %}
+  <table class="kv">
+    <thead><tr><th>code</th><th>HTTP</th><th>Sabab va nima qilish kerak</th></tr></thead>
+    <tbody>
+      <tr><td>invalid_api_key</td><td>401</td><td>Kalit noto'g'ri yoki yuborilmagan. Sarlavhani tekshiring</td></tr>
+      <tr><td>project_disabled</td><td>403</td><td>Loyiha admin panelda o'chirilgan</td></tr>
+      <tr><td>validation_error</td><td>422</td><td>So'rov maydonlari noto'g'ri; <code>details</code> da qaysi maydon ekani bor</td></tr>
+      <tr><td>invalid_phone</td><td>422</td><td>Raqam formati noto'g'ri yoki ruxsat etilmagan davlat</td></tr>
+      <tr><td>empty_text</td><td>422</td><td>Matn bo'sh</td></tr>
+      <tr><td>rate_limited</td><td>429</td><td>Bitta raqamga soatiga/daqiqasiga ruxsat etilgandan ko'p SMS. Biroz kuting</td></tr>
+      <tr><td>project_daily_limit / project_monthly_limit</td><td>429</td><td>Loyihaning kunlik/oylik limiti tugadi. Limitni loyiha sozlamalarida oshiring</td></tr>
+      <tr><td>quota_exceeded</td><td>429</td><td>Modemdagi SMS paketi tugagan</td></tr>
+      <tr><td>no_modem</td><td>503</td><td>Faol modem yo'q. Modemlar sahifasini tekshiring</td></tr>
+      <tr><td>too_many_attempts</td><td>429</td><td>Noto'g'ri kalit bilan haddan ortiq urinish</td></tr>
+      <tr><td>not_found / not_cancellable</td><td>404 / 409</td><td>Xabar topilmadi / bekor qilib bo'lmaydi</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">Xato <code>5xx</code> yoki tarmoq uzilishi bo'lsa, o'sha <code>external_id</code> bilan so'rovni qayta yuborish xavfsiz: SMS ikki marta ketmaydi.</div>
+</div>
+
+<h2 id="webhook">8. Webhook (holat haqida xabar)</h2>
+<div class="card">
+  <p style="margin-top:0">Loyiha sozlamalarida <b>Webhook URL</b> kiritsangiz, xabar yakuniy holatga (<code>sent</code>, <code>failed</code>, <code>expired</code>) o'tganda tizim sizning manzilingizga <code>POST</code> yuboradi. Javob <code>2xx</code> bo'lmasa, 30 s, 2 daq, 10 daq, 1 soat, 6 soat oralig'ida qayta uriniladi.</p>
+  {% call code('c-wh') %}{"event":"sms.status","data":{"id":1042,"external_id":"order-77","to":"+998901234567","status":"sent","parts":1,"parts_sent":1,"encoding":"gsm7","error":null,"created_at":"2026-11-07T02:15:00Z","sent_at":"2026-11-07T02:15:06Z","finished_at":"2026-11-07T02:15:06Z","project":"Mening loyiham"}}{% endcall %}
+  <p>Sarlavhalar: <code>X-SMS-Timestamp</code> va <code>X-SMS-Signature</code> (<code>sha256=...</code>). Imzo: <code>HMAC-SHA256(secret, timestamp + "." + xom_tana)</code>. Sirni (secret) loyiha sozlamalarida belgilang va so'rov haqiqiyligini tekshiring:</p>
+  {% call code('c-whpy') %}import hmac, hashlib
+
+def verify(secret: str, timestamp: str, raw_body: bytes, signature: str) -> bool:
+    mac = hmac.new(secret.encode(), timestamp.encode() + b"." + raw_body, hashlib.sha256)
+    return hmac.compare_digest("sha256=" + mac.hexdigest(), signature)
+{% endcall %}
+</div>
+
+<h2 id="notes">9. Muhim eslatmalar</h2>
+<div class="card">
+  <ul style="margin:0;padding-left:20px">
+    <li><b>Navbat:</b> barcha SMS lar bitta umumiy navbat bilan, ketma-ket yuboriladi. Har biri orasida admin sozlamalarida belgilangan interval (standart 5 soniya) bor. Shuning uchun OTP uchun SMS bir necha soniya kechikishi mumkin.</li>
+    <li><b>Muddat:</b> navbatda sozlamalardagi muddatdan (standart 15 daqiqa) ortiq tursa, xabar <code>expired</code> bo'ladi. Eskirgan OTP kod yuborilmaydi.</li>
+    <li><b>Belgilar:</b> lotin harflar va ko'p belgilar bitta SMS da 160 belgi. Kirill yoki maxsus belgi bo'lsa 70 belgi. Uzun matn bir necha SMS hisoblanadi (limit qismlar bo'yicha hisoblanadi).</li>
+    <li><b>Maxfiylik:</b> sozlamalarda yoqilsa, jurnalda matndagi raqamlar (OTP) yashiriladi.</li>
+    <li><b>Xavfsizlik:</b> kalit sizib chiqsa, loyiha sahifasida yangi kalit yarating. Eskisi darhol ishlamay qoladi.</li>
+  </ul>
+</div>
+
+</div>
+<aside class="toc">
+  <a href="#start">1. Tez boshlash</a><a href="#auth">2. Autentifikatsiya</a><a href="#send">3. SMS yuborish</a><a href="#examples">4. Kod namunalari</a>
+  <a href="#status">5. Holat</a><a href="#more">6. Boshqa so'rovlar</a><a href="#errors">7. Xatolar</a><a href="#webhook">8. Webhook</a><a href="#notes">9. Eslatmalar</a>
+</aside>
+</div>
+{% endblock %}

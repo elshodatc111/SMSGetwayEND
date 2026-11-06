@@ -2,7 +2,7 @@ import re
 
 from tests.conftest import csrf_of
 
-PAGES = ["/admin", "/admin/status", "/admin/projects", "/admin/modems", "/admin/messages", "/admin/send", "/admin/settings"]
+PAGES = ["/admin", "/admin/status", "/admin/projects", "/admin/modems", "/admin/messages", "/admin/send", "/admin/settings", "/admin/docs"]
 
 
 def test_requires_login(client):
