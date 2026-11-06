@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import signal with context %}
+{% block title %}Modemlar{% endblock %}
+{% block content %}
+<h1>Modemlar</h1>
+<div id="live" data-refresh="6000">
+<div class="card">
+  <div class="row" style="align-items:center">
+    <div>
+      Rejim: <b>{{ 'MOCK (soxta)' if cfg.modem_mode == 'mock' else 'Haqiqiy USB modem (avto qidirish)' }}</b>
+      · oxirgi skanerlash: {{ fmt(last_scan) }}<div class="hint">{{ note }}</div>
+    </div>
+    <form method="post" action="/admin/modems/rescan" class="shrink"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn primary">🔄 Qayta skanerlash</button></form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap"><table>
+    <thead><tr><th>Modem</th><th>IMEI</th><th>Port</th><th>Operator / SIM</th><th>Signal</th><th>Holat</th><th class="num">Paket</th><th class="num">Qoldiq</th><th></th></tr></thead>
+    <tbody>
+    {% for r in modems %}
+      <tr>
+        <td><b>{{ r.row.label or ('Modem #' ~ r.row.id) }}</b>{% if r.row.is_mock %} <span class="badge info">mock</span>{% endif %}</td>
+        <td class="mono">{{ r.row.imei }}</td><td class="mono">{{ r.row.port }}</td>
+        <td>{{ r.row.operator or '—' }}<div class="muted mono">{{ r.row.sim_number }}</div></td>
+        <td>{{ signal(r.row.signal) }}</td>
+        <td>{% if not r.row.is_enabled %}<span class="badge muted">o'chirilgan</span>{% elif not r.row.is_online %}<span class="badge err">uzilgan</span>{% elif not r.row.registered %}<span class="badge warn">tarmoqda emas</span>{% elif r.busy %}<span class="badge info">yuboryapti</span>{% else %}<span class="badge ok">tayyor</span>{% endif %}</td>
+        <td class="num">{{ r.row.monthly_limit or '—' }}</td>
+        <td class="num">{{ r.remaining if r.remaining is not none else '∞' }}</td>
+        <td><a class="btn small" href="/admin/modems/{{ r.row.id }}">Sozlash</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="muted">Modem topilmadi. USB modemni ulab "Qayta skanerlash" ni bosing. Linuxda ModemManager xizmati o'chirilgan bo'lishi kerak (README ga qarang).</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+</div>
+{% endblock %}

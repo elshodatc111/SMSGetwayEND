@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import signal with context %}
+{% block title %}{{ m.label or m.imei }}{% endblock %}
+{% block content %}
+<h1>{{ m.label or ('Modem #' ~ m.id) }} {% if m.is_online %}<span class="badge ok">ulangan</span>{% else %}<span class="badge err">uzilgan</span>{% endif %}</h1>
+
+<div class="grid g4">
+  <div class="card stat"><div class="label">Qoldiq SMS</div><div class="value">{{ remaining if remaining is not none else '∞' }}</div><div class="sub">{% if m.quota_checked_at %}USSD: {{ fmt(m.quota_checked_at, False) }}{% else %}USSD tekshirilmagan{% endif %}</div></div>
+  <div class="card stat"><div class="label">Shu oy yuborilgan</div><div class="value">{{ used }}</div><div class="sub">paket: {{ m.monthly_limit or '—' }}</div></div>
+  <div class="card stat"><div class="label">Signal</div><div class="value" style="font-size:22px">{{ signal(m.signal) }}</div><div class="sub">{{ m.operator or 'operator noma\'lum' }}{% if not m.registered %} · tarmoqda emas{% endif %}</div></div>
+  <div class="card stat"><div class="label">Oxirgi aloqa</div><div class="value" style="font-size:16px">{{ fmt(m.last_seen_at) }}</div><div class="sub mono">{{ m.port }}</div></div>
+</div>
+{% if m.last_error %}<div class="flash err">{{ m.last_error }}</div>{% endif %}
+
+<div class="card">
+  <h3>Sozlamalar</h3>
+  <form method="post" action="/admin/modems/{{ m.id }}/edit">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="row">
+      <div><label>Nomi</label><input type="text" name="label" value="{{ m.label }}" placeholder="Ucell SIM"></div>
+      <div><label>SIM raqami</label><input type="text" name="sim_number" value="{{ m.sim_number }}" placeholder="+998901234567"></div>
+    </div>
+    <label class="check"><input type="checkbox" name="is_enabled" {{ 'checked' if m.is_enabled }}> Yuborish uchun yoqilgan</label>
+    <div class="row">
+      <div><label>Oylik SMS paketi (soni)</label><input type="number" name="monthly_limit" min="0" value="{{ m.monthly_limit or '' }}" placeholder="masalan 500">
+        <div class="hint">Paket tugagach shu modem orqali yuborilmaydi. Hisob har oyning 1-sanasida noldan boshlanadi.</div></div>
+      <div><label>Qoldiqni qo'lda belgilash</label><input type="number" name="manual_remaining" min="0" placeholder="faqat o'zgartirish uchun">
+        <div class="hint">Operator hisobi bilan farq bo'lsa to'g'rilash uchun.</div></div>
+    </div>
+    <h3 style="margin-top:20px">Paket qoldig'ini avtomatik o'qish (USSD)</h3>
+    <div class="row">
+      <div><label>USSD kodi</label><input type="text" name="ussd_code" value="{{ m.ussd_code }}" placeholder="*100#" class="mono">
+        <div class="hint">Menyu bo'lsa vergul bilan javoblarni yozing: <code>*100#,1,2</code></div></div>
+      <div><label>Regex (ixtiyoriy)</label><input type="text" name="ussd_regex" value="{{ m.ussd_regex }}" placeholder="(\d+)\s*ta\s*SMS" class="mono">
+        <div class="hint">Birinchi guruh = qolgan SMS soni. Bo'sh bo'lsa, "… ta SMS" naqshi avtomatik qidiriladi.</div></div>
+    </div>
+    <div class="actions"><button class="btn primary">Saqlash</button></div>
+  </form>
+  <div class="actions">
+    <form method="post" action="/admin/modems/{{ m.id }}/ussd" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn" {{ 'disabled' if not m.ussd_code }}>📡 USSD ni hozir tekshirish</button></form>
+  </div>
+  {% if m.ussd_reply or m.ussd_error %}
+  <label>Oxirgi USSD javobi</label>
+  <pre class="code">{{ m.ussd_reply or '(bo\'sh)' }}</pre>
+  {% if m.ussd_error %}<div class="flash err">{{ m.ussd_error }}</div>{% endif %}
+  {% endif %}
+</div>
+
+<div class="card" id="at">
+  <h3>AT konsol (diagnostika)</h3>
+  <p class="muted">Modemga to'g'ridan-to'g'ri AT buyruq yuborish. Masalan: <code>AT+CSQ</code>, <code>AT+COPS?</code>, <code>AT+CGMM</code> (model), <code>AT+CPIN?</code>.</p>
+  <form method="post" action="/admin/modems/{{ m.id }}/at">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="row"><div><input type="text" name="cmd" class="mono" placeholder="AT+CGMM" required></div><div class="shrink"><button class="btn">Yuborish</button></div></div>
+  </form>
+  {% if at_result %}<label>&gt; {{ at_result.cmd }}</label><pre class="code">{{ at_result.out }}</pre>{% endif %}
+</div>
+{% endblock %}

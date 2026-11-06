@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Loyihalar{% endblock %}
+{% block content %}
+<h1>Loyihalar</h1>
+<div class="card">
+  <div class="table-wrap"><table>
+    <thead><tr><th>Nomi</th><th>API kalit</th><th class="num">Bugun</th><th class="num">Shu oy</th><th class="num">Jami</th><th>Limit (kun / oy)</th><th>Webhook</th><th>Holat</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><a href="/admin/projects/{{ r.p.id }}"><b>{{ r.p.name }}</b></a></td>
+        <td class="mono">{{ r.p.key_prefix }}…</td>
+        <td class="num">{{ r.t.today.parts }}</td><td class="num">{{ r.t.month.parts }}</td><td class="num">{{ r.t.total.parts }}</td>
+        <td>{{ r.p.daily_limit or '∞' }} / {{ r.p.monthly_limit or '∞' }}</td>
+        <td>{{ '✓' if r.p.webhook_url else '—' }}</td>
+        <td>{% if r.p.is_active %}<span class="badge ok">faol</span>{% else %}<span class="badge muted">o'chirilgan</span>{% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="8" class="muted">Hali loyiha yo'q</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <h3>Yangi loyiha</h3>
+  <form method="post" action="/admin/projects">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="row">
+      <div><label>Nomi</label><input type="text" name="name" placeholder="KinderDesk" required maxlength="100"></div>
+      <div><label>Kunlik limit (SMS)</label><input type="number" name="daily_limit" min="0" placeholder="bo'sh = cheklovsiz"></div>
+      <div><label>Oylik limit (SMS)</label><input type="number" name="monthly_limit" min="0" placeholder="bo'sh = cheklovsiz"></div>
+    </div>
+    <label>Webhook URL (ixtiyoriy)</label>
+    <input type="url" name="webhook_url" placeholder="https://kinderdesk.uz/api/sms-webhook">
+    <div class="hint">Yuborish natijasi (sent/failed) shu manzilga POST qilinadi. Bo'sh qoldirsangiz, loyiha natijani GET /api/v1/sms/{id} orqali o'zi so'raydi.</div>
+    <div class="actions"><button class="btn primary">Yaratish va API kalit olish</button></div>
+  </form>
+</div>
+{% endblock %}

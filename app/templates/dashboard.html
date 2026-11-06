@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, daily_bars, messages_table with context %}
+{% block title %}Bosh sahifa{% endblock %}
+{% block content %}
+<h1>Bosh sahifa</h1>
+<div id="live" data-refresh="8000">
+  <div class="grid g4">
+    <div class="card stat"><div class="label">Bugun yuborildi</div><div class="value">{{ today.parts }}</div><div class="sub">{{ today.sent }} xabar · {{ today.failed }} xato</div></div>
+    <div class="card stat"><div class="label">Shu oy yuborildi</div><div class="value">{{ month.parts }}</div><div class="sub">{{ month.sent }} xabar · {{ month.failed }} xato</div></div>
+    <div class="card stat"><div class="label">Navbatda</div><div class="value">{{ st.queue_size }}</div><div class="sub">{% if st.queue_oldest_age %}eng eskisi {{ st.queue_oldest_age }} s{% else %}bo'sh{% endif %}</div></div>
+    <div class="card stat">
+      <div class="label">Tizim</div>
+      <div class="value"><span class="dot {{ 'ok' if st.status == 'ok' else ('warn' if st.status == 'degraded' else 'err') }}"></span>{{ {'ok':'Ishlayapti','degraded':'Cheklangan','down':'To\'xtagan'}[st.status] }}</div>
+      <div class="sub">Modemlar: {{ st.modems_online }} ulangan, {{ st.modems_usable }} tayyor · <a href="/admin/status">batafsil</a></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Oxirgi 14 kun (SMS soni)</h3>{{ daily_bars(series, max_parts) }}</div>
+    <div class="card">
+      <h3>Modemlar</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Modem</th><th>Operator</th><th>Holat</th><th class="num">Qoldiq</th></tr></thead>
+        <tbody>
+        {% for r in st.modems %}
+          <tr><td><a href="/admin/modems/{{ r.row.id }}">{{ r.row.label or r.row.port or r.row.imei }}</a></td><td>{{ r.row.operator or '—' }}</td>
+          <td>{% if not r.row.is_enabled %}<span class="badge muted">o'chirilgan</span>{% elif r.row.is_online %}<span class="badge ok">ulangan</span>{% else %}<span class="badge err">uzilgan</span>{% endif %}</td>
+          <td class="num">{{ r.remaining if r.remaining is not none else '∞' }}</td></tr>
+        {% else %}<tr><td colspan="4" class="muted">Modem topilmadi. USB modemni ulang yoki "Modemlar" bo'limida skanerlang.</td></tr>{% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Loyihalar bo'yicha</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Loyiha</th><th class="num">Bugun</th><th class="num">Shu oy</th><th class="num">Jami</th><th class="num">Xato (oy)</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr><td><a href="/admin/projects/{{ r.p.id }}">{{ r.p.name }}</a></td>
+        <td class="num">{{ r.t.today.parts }}{% if r.p.daily_limit %} <span class="muted">/ {{ r.p.daily_limit }}</span>{% endif %}</td>
+        <td class="num">{{ r.t.month.parts }}{% if r.p.monthly_limit %} <span class="muted">/ {{ r.p.monthly_limit }}</span>{% endif %}</td>
+        <td class="num">{{ r.t.total.parts }}</td><td class="num">{{ r.t.month.failed }}</td>
+        <td>{% if not r.p.is_active %}<span class="badge muted">o'chirilgan</span>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="6" class="muted">Hali loyiha yo'q. <a href="/admin/projects">Loyiha yarating</a></td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card"><h3>Oxirgi xabarlar</h3>{{ messages_table(last) }}<div class="pager"><a href="/admin/messages">Butun jurnal →</a></div></div>
+</div>
+{% endblock %}

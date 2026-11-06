@@ -1,0 +1,42 @@
+{% macro status_badge(status) %}
+  {% set s = STATUS_LABELS.get(status, (status, 'muted')) %}<span class="badge {{ s[1] }}">{{ s[0] }}</span>
+{% endmacro %}
+
+{% macro signal(csq) %}
+  {% if csq is none %}<span class="muted">—</span>{% else %}
+    {% set lvl = 4 if csq >= 20 else (3 if csq >= 14 else (2 if csq >= 9 else (1 if csq >= 3 else 0))) %}
+    <span class="sig" title="CSQ {{ csq }}/31">{% for i in range(1, 5) %}<i class="{{ 'on' if i <= lvl else '' }}" style="height: {{ 3 + i * 3 }}px"></i>{% endfor %}</span>{{ (csq / 31 * 100) | round | int }}%
+  {% endif %}
+{% endmacro %}
+
+{% macro daily_bars(series, max_parts) %}
+  <div class="bars">
+    {% for d in series %}
+      {% set h = (d.parts / max_parts * 100) if max_parts else 0 %}
+      <div class="b {{ 'zero' if d.parts == 0 else '' }}" style="height: {{ [h, 2] | max }}%" title="{{ d.day }}: {{ d.parts }} SMS, {{ d.sent }} yuborildi, {{ d.failed }} xato"></div>
+    {% endfor %}
+  </div>
+  <div class="muted" style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span>{{ series[0].day[5:] }}</span><span>{{ series[-1].day[5:] }}</span></div>
+{% endmacro %}
+
+{% macro messages_table(rows, show_project=True, cancel=True) %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Vaqt</th>{% if show_project %}<th>Loyiha</th>{% endif %}<th>Raqam</th><th>Holat</th><th class="num">Qism</th><th>Matn / xato</th><th></th></tr></thead>
+    <tbody>
+    {% for m in rows %}
+      <tr>
+        <td>{{ m.id }}</td><td class="mono">{{ fmt(m.created_at) }}</td>
+        {% if show_project %}<td>{{ m.project.name }}</td>{% endif %}
+        <td class="mono">{{ m.to_number }}</td>
+        <td>{{ status_badge(m.status) }}{% if m.attempts > 1 %} <span class="muted" title="Urinishlar">×{{ m.attempts }}</span>{% endif %}</td>
+        <td class="num">{{ m.parts }}</td>
+        <td><div class="truncate" title="{{ m.text }}">{{ m.text }}</div>{% if m.error %}<div style="color:var(--err);font-size:12.5px">{{ m.error }}</div>{% endif %}</td>
+        <td>{% if cancel and m.status == 'queued' %}
+          <form class="inline" method="post" action="/admin/messages/{{ m.id }}/cancel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn small danger">Bekor</button></form>{% endif %}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="muted">Hozircha xabar yo'q</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+{% endmacro %}

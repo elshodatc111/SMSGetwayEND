@@ -1,0 +1,30 @@
+services:
+  app:
+    build: .
+    container_name: sms_gateway
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      TZ: Asia/Tashkent
+    ports:
+      - "${HTTP_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data
+      - /dev:/dev                 # USB modem ulanganda/uzilganda avtomatik ko'rinishi uchun
+    device_cgroup_rules:
+      - "c 188:* rmw"             # /dev/ttyUSB*
+      - "c 166:* rmw"             # /dev/ttyACM*
+
+  # Cloudflare Tunnel: sms.elshod.date -> http://app:8000
+  # Yoqish:  docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: sms_cloudflared
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - app

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import messages_table with context %}
+{% block title %}Jurnal{% endblock %}
+{% block content %}
+<h1>SMS jurnali <span class="muted" style="font-size:15px">({{ total }})</span></h1>
+<div class="card">
+  <form method="get" action="/admin/messages">
+    <div class="row">
+      <div><label>Loyiha</label>
+        <select name="project_id"><option value="">Hammasi</option>{% for p in projects %}<option value="{{ p.id }}" {{ 'selected' if f.project_id == p.id|string }}>{{ p.name }}</option>{% endfor %}</select></div>
+      <div><label>Holat</label>
+        <select name="status"><option value="">Hammasi</option>{% for k, v in STATUS_LABELS.items() %}<option value="{{ k }}" {{ 'selected' if f.status == k }}>{{ v[0] }}</option>{% endfor %}</select></div>
+      <div><label>Raqam</label><input type="text" name="q" value="{{ f.q }}" placeholder="901234567"></div>
+      <div><label>Sanadan</label><input type="date" name="date_from" value="{{ f.date_from }}"></div>
+      <div><label>Sanagacha</label><input type="date" name="date_to" value="{{ f.date_to }}"></div>
+      <div class="shrink"><button class="btn primary">Filtr</button> <a class="btn" href="/admin/messages">Tozalash</a> <a class="btn" href="/admin/messages.csv?{{ qs }}">CSV</a></div>
+    </div>
+  </form>
+</div>
+<div class="card">
+  {{ messages_table(rows) }}
+  <div class="pager">
+    {% if page > 1 %}<a class="btn small" href="/admin/messages?{{ qs }}&page={{ page - 1 }}">← Oldingi</a>{% endif %}
+    <span class="muted">{{ page }} / {{ pages }}</span>
+    {% if page < pages %}<a class="btn small" href="/admin/messages?{{ qs }}&page={{ page + 1 }}">Keyingi →</a>{% endif %}
+  </div>
+</div>
+{% endblock %}

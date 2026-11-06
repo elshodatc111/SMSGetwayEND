@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Test SMS{% endblock %}
+{% block content %}
+<h1>Test SMS yuborish</h1>
+<div class="card" style="max-width:640px">
+  <form method="post" action="/admin/send">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Telefon raqam</label>
+    <input type="text" name="to" placeholder="+998901234567" required>
+    <label>Matn</label>
+    <textarea name="text" required maxlength="2000" id="txt" placeholder="Sinov xabari"></textarea>
+    <div class="hint" id="cnt">0 belgi</div>
+    <div class="actions"><button class="btn primary">Navbatga qo'yish</button></div>
+  </form>
+  <p class="hint">Xabar "{{ 'Admin test (tizim)' }}" loyihasi nomidan yuboriladi va jurnalda ko'rinadi. Bir raqamga yuborish chastotasi umumiy rate-limit qoidalariga bo'ysunadi.</p>
+</div>
+<script>
+  var t = document.getElementById("txt"), c = document.getElementById("cnt");
+  t.addEventListener("input", function () {
+    var v = t.value, uni = /[^\x00-\x7F]/.test(v.replace(/[ʻʼ’‘`´]/g, "'")) ;
+    var limit = uni ? 70 : 160, parts = Math.max(1, Math.ceil(v.length / (v.length <= limit ? limit : (uni ? 67 : 153))));
+    c.textContent = v.length + " belgi · taxminan " + parts + " SMS" + (uni ? " (kirill/maxsus belgi: qisqa SMS)" : "");
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_macros.html" import daily_bars, messages_table with context %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block content %}
+<h1>{{ p.name }} {% if p.is_active %}<span class="badge ok">faol</span>{% else %}<span class="badge muted">o'chirilgan</span>{% endif %}</h1>
+
+{% if new_key %}
+<div class="keybox">
+  <b>API kalit (faqat hozir ko'rsatiladi — nusxalab oling!)</b>
+  <code id="newkey">{{ new_key }}</code>
+  <button type="button" class="btn small" data-copy="#newkey">Nusxalash</button>
+  <div class="hint">Keyin kalit saqlanmaydi (faqat hash). Yo'qotsangiz — "Kalitni yangilash" bilan yangisini yarating.</div>
+</div>
+{% endif %}
+
+<div class="grid g4">
+  <div class="card stat"><div class="label">Bugun</div><div class="value">{{ t.today.parts }}</div><div class="sub">{{ t.today.sent }} xabar · {{ t.today.failed }} xato{% if p.daily_limit %} · limit {{ p.daily_limit }} (qabul: {{ period.day_parts }}){% endif %}</div></div>
+  <div class="card stat"><div class="label">Shu oy</div><div class="value">{{ t.month.parts }}</div><div class="sub">{{ t.month.sent }} xabar · {{ t.month.failed }} xato{% if p.monthly_limit %} · limit {{ p.monthly_limit }} (qabul: {{ period.month_parts }}){% endif %}</div></div>
+  <div class="card stat"><div class="label">Jami</div><div class="value">{{ t.total.parts }}</div><div class="sub">{{ t.total.sent }} xabar · {{ t.total.failed }} xato</div></div>
+  <div class="card stat"><div class="label">API kalit</div><div class="value mono" style="font-size:18px">{{ p.key_prefix }}…</div><div class="sub">yaratilgan {{ fmt(p.created_at, False) }}</div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h3>Oxirgi 30 kun</h3>{{ daily_bars(series, max_parts) }}</div>
+  <div class="card">
+    <h3>Oylar bo'yicha</h3>
+    <table><thead><tr><th>Oy</th><th class="num">SMS</th><th class="num">Xabar</th><th class="num">Xato</th></tr></thead>
+    <tbody>{% for m in months %}<tr><td>{{ m.month }}</td><td class="num">{{ m.parts }}</td><td class="num">{{ m.sent }}</td><td class="num">{{ m.failed }}</td></tr>{% else %}<tr><td colspan="4" class="muted">Ma'lumot yo'q</td></tr>{% endfor %}</tbody></table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Sozlamalar</h3>
+  <form method="post" action="/admin/projects/{{ p.id }}/edit">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="row">
+      <div><label>Nomi</label><input type="text" name="name" value="{{ p.name }}" required maxlength="100"></div>
+      <div><label>Kunlik limit (SMS)</label><input type="number" name="daily_limit" min="0" value="{{ p.daily_limit or '' }}" placeholder="cheklovsiz"></div>
+      <div><label>Oylik limit (SMS)</label><input type="number" name="monthly_limit" min="0" value="{{ p.monthly_limit or '' }}" placeholder="cheklovsiz"></div>
+    </div>
+    <label>Webhook URL</label>
+    <input type="url" name="webhook_url" value="{{ p.webhook_url }}" placeholder="https://...">
+    <div class="actions"><button class="btn primary">Saqlash</button></div>
+  </form>
+  <div class="actions">
+    <form method="post" action="/admin/projects/{{ p.id }}/regenerate" class="inline" data-confirm="Eski kalit darhol ishlamay qoladi. Davom etasizmi?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn danger">Kalitni yangilash</button></form>
+    <form method="post" action="/admin/projects/{{ p.id }}/toggle" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn">{{ "O'chirish" if p.is_active else 'Yoqish' }}</button></form>
+  </div>
+</div>
+
+{% if p.webhook_url %}
+<div class="card">
+  <h3>Webhook</h3>
+  <p class="muted">Har bir xabar yakunlanganda (<code>sent</code>, <code>failed</code>, <code>expired</code>) {{ p.webhook_url }} ga JSON POST qilinadi. Imzo: <code>X-SMS-Signature = sha256(HMAC(secret, timestamp + "." + body))</code>.</p>
+  <label>Secret</label><input type="text" id="whsec" value="{{ p.webhook_secret }}" readonly class="mono">
+  <div class="actions">
+    <form method="post" action="/admin/projects/{{ p.id }}/webhook-test" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn">Sinov yuborish</button></form>
+    <form method="post" action="/admin/projects/{{ p.id }}/webhook-secret" class="inline" data-confirm="Eski secret ishlamay qoladi. Davom etasizmi?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn">Secretni yangilash</button></form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Ulanish namunasi</h3>
+<pre class="code">curl -X POST {{ base_url }}/api/v1/sms/send \
+  -H "Authorization: Bearer &lt;API_KALIT&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "+998901234567", "text": "Tasdiqlash kodi: 482910", "external_id": "otp-123"}'</pre>
+</div>
+
+<div class="card"><h3>Oxirgi xabarlar</h3>{{ messages_table(recent, show_project=False) }}<div class="pager"><a href="/admin/messages?project_id={{ p.id }}">Hammasi →</a></div></div>
+{% endblock %}

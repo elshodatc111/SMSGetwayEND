@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Kirish{% endblock %}
+{% block content %}
+<div class="login-box">
+  <div class="card">
+    <h1>📟 SMS Gateway</h1>
+    <form method="post" action="/admin/login">
+      <label>Login</label>
+      <input type="text" name="username" autocomplete="username" autofocus required>
+      <label>Parol</label>
+      <input type="password" name="password" autocomplete="current-password" required>
+      <div class="actions"><button class="btn primary" style="width:100%">Kirish</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
