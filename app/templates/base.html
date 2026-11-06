@@ -13,7 +13,7 @@
 <header class="topbar">
   <a class="brand" href="/admin">📟 SMS Gateway</a>
   <nav class="nav">
-    {% for href, key, label in [('/admin','dashboard','Bosh sahifa'),('/admin/status','status','Tizim holati'),('/admin/projects','projects','Loyihalar'),('/admin/modems','modems','Modemlar'),('/admin/messages','messages','Jurnal'),('/admin/send','send','Test SMS'),('/admin/settings','settings','Sozlamalar')] %}
+    {% for href, key, label in [('/admin','dashboard','Bosh sahifa'),('/admin/status','status','Tizim holati'),('/admin/projects','projects','Loyihalar'),('/admin/modems','modems','Modemlar'),('/admin/messages','messages','Jurnal'),('/admin/send','send','SMS yuborish'),('/admin/settings','settings','Sozlamalar')] %}
       <a href="{{ href }}" class="{{ 'active' if active == key else '' }}">{{ label }}</a>
     {% endfor %}
   </nav>

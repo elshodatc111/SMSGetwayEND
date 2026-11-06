@@ -7,10 +7,10 @@ from ..models import AppSetting
 SETTING_DEFS: list[tuple[str, str, object, str, str]] = [
     ("rate_per_minute", "int", 1, "Bir raqamga 1 daqiqada maks. SMS", "0 = cheklovsiz (OTP himoyasi)"),
     ("rate_per_hour", "int", 5, "Bir raqamga 1 soatda maks. SMS", "0 = cheklovsiz"),
-    ("message_ttl_seconds", "int", 300, "Navbatda kutish muddati (soniya)", "Modem yo'q yoki limit tugagan bo'lsa, shu vaqtdan keyin xabar 'expired' bo'ladi"),
+    ("message_ttl_seconds", "int", 900, "Navbatda kutish muddati (soniya)", "Modem yo'q yoki limit tugagan bo'lsa, shu vaqtdan keyin xabar 'expired' bo'ladi"),
     ("max_attempts", "int", 3, "Yuborishga urinishlar soni", "Xato bo'lsa qayta urinish"),
     ("retry_delay_seconds", "int", 15, "Qayta urinish oralig'i (soniya)", "Urinish raqamiga ko'paytiriladi"),
-    ("send_interval_ms", "int", 500, "SMSlar orasidagi pauza (ms)", "Modem uchun yengillik"),
+    ("send_interval_seconds", "int", 5, "SMSlar orasidagi pauza (soniya)", "Navbat bilan: bir vaqtda bitta SMS, har biridan keyin shu qadar kutiladi"),
     ("log_retention_days", "int", 90, "Jurnalni saqlash muddati (kun)", "Undan eski xabarlar o'chiriladi, statistika qoladi"),
     ("normalize_apostrophes", "bool", True, "Apostrofni avtomatik tuzatish", "ʻ ’ ‘ ` belgilarini oddiy ' ga almashtiradi (SMS arzonroq: 160 belgi)"),
     ("mask_text", "bool", True, "Jurnalda matnni yashirish", "Yuborilgach 4+ xonali raqamlar (OTP) *** bilan almashtiriladi"),

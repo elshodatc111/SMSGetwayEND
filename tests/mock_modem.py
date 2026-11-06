@@ -1,9 +1,9 @@
-"""Soxta modem: haqiqiy modemsiz ishlab chiqish va sinash uchun."""
+"""Faqat avtomatik testlar uchun soxta modem (mahsulot kodida ishlatilmaydi)."""
 import random
 import threading
 import time
 
-from .base import BaseModem, ModemError, ModemInfo, SendError
+from app.modem.base import BaseModem, ModemError, ModemInfo, SendError
 
 
 class MockModem(BaseModem):

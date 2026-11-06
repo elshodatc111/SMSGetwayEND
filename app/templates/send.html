@@ -1,25 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Test SMS{% endblock %}
+{% block title %}SMS yuborish{% endblock %}
 {% block content %}
-<h1>Test SMS yuborish</h1>
-<div class="card" style="max-width:640px">
+<h1>SMS yuborish</h1>
+<div class="card" style="max-width:720px">
   <form method="post" action="/admin/send">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Telefon raqam</label>
-    <input type="text" name="to" placeholder="+998901234567" required>
+
+    <label>Qaysi loyiha nomidan</label>
+    <select name="project_id">
+      {% for p in projects %}
+        <option value="{{ p.id }}" {% if p.name == admin_project %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Telefon raqam(lar)</label>
+    <textarea name="numbers" id="nums" rows="3" required placeholder="+998901234567&#10;+998931234567 (har birini yangi qatorda yoki vergul bilan)"></textarea>
+    <div class="hint" id="ncnt">0 ta raqam</div>
+
     <label>Matn</label>
-    <textarea name="text" required maxlength="2000" id="txt" placeholder="Sinov xabari"></textarea>
+    <textarea name="text" required maxlength="2000" id="txt" placeholder="Xabar matni"></textarea>
     <div class="hint" id="cnt">0 belgi</div>
+
     <div class="actions"><button class="btn primary">Navbatga qo'yish</button></div>
   </form>
-  <p class="hint">Xabar "{{ 'Admin test (tizim)' }}" loyihasi nomidan yuboriladi va jurnalda ko'rinadi. Bir raqamga yuborish chastotasi umumiy rate-limit qoidalariga bo'ysunadi.</p>
+  <p class="hint">
+    SMSlar <b>navbat bilan</b> yuboriladi: bir vaqtda bitta, har biridan keyin <b>{{ interval }} soniya</b> pauza.
+    Hozir navbatda: <b>{{ queue_size }}</b> ta. Bir martada {{ max_batch }} tagacha raqam.
+    Natijani <a href="/admin/messages">Jurnal</a> sahifasida kuzating.
+    Bir raqamga yuborish chastotasi umumiy rate-limit qoidalariga bo'ysunadi.
+  </p>
 </div>
 <script>
   var t = document.getElementById("txt"), c = document.getElementById("cnt");
+  var n = document.getElementById("nums"), nc = document.getElementById("ncnt");
   t.addEventListener("input", function () {
-    var v = t.value, uni = /[^\x00-\x7F]/.test(v.replace(/[ʻʼ’‘`´]/g, "'")) ;
+    var v = t.value, uni = /[^\x00-\x7F]/.test(v.replace(/[ʻʼ’‘`´]/g, "'"));
     var limit = uni ? 70 : 160, parts = Math.max(1, Math.ceil(v.length / (v.length <= limit ? limit : (uni ? 67 : 153))));
     c.textContent = v.length + " belgi · taxminan " + parts + " SMS" + (uni ? " (kirill/maxsus belgi: qisqa SMS)" : "");
+  });
+  n.addEventListener("input", function () {
+    var list = n.value.split(/[\s,;]+/).filter(Boolean);
+    nc.textContent = new Set(list).size + " ta raqam" + (new Set(list).size ? " · taxminan " + Math.ceil(new Set(list).size * {{ interval }} / 60 * 10) / 10 + " daqiqa" : "");
   });
 </script>
 {% endblock %}

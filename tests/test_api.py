@@ -173,3 +173,33 @@ def test_webhook_delivery(client, project, wait):
     assert headers["X-SMS-Signature"] == expected
     data = json.loads(body)
     assert data["event"] == "sms.status" and data["data"]["status"] == "sent" and data["data"]["external_id"] == "wh-1"
+
+
+def test_message_alias_fields(client, project):
+    """`message` va `phone` nomlari ham qabul qilinadi."""
+    r = client.post("/api/v1/sms/send", json={"phone": "+998901234599", "message": "Salom"}, headers=project["headers"])
+    assert r.status_code == 202
+
+
+def test_sequential_with_interval(client, project):
+    """SMSlar bittadan, har biri orasida sozlangan pauza bilan yuboriladi."""
+    from app.models import Message
+
+    with SessionLocal() as db:
+        set_setting(db, "send_interval_seconds", 1)
+        db.commit()
+    ids = [send(client, project, to=f"+99890000030{i}").json()["id"] for i in range(3)]
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        with SessionLocal() as db:
+            rows = [db.get(Message, i) for i in ids]
+            if all(r.status == "sent" for r in rows):
+                break
+        time.sleep(0.2)
+    with SessionLocal() as db:
+        rows = [db.get(Message, i) for i in ids]
+        assert all(r.status == "sent" for r in rows)
+        times = [r.sent_at for r in rows]
+    gaps = [(b - a).total_seconds() for a, b in zip(times, times[1:])]
+    assert all(g >= 0.9 for g in gaps), gaps
+    assert all(g < 5 for g in gaps), gaps

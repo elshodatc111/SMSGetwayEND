@@ -22,7 +22,8 @@ from .runtime import get_runtime
 from .security import hash_password, hash_key, new_api_key, new_csrf, new_webhook_secret, verify_password
 from .services import stats
 from .services.messaging import ApiError, create_message, finish_message, webhook_payload
-from .services.settings_store import SETTING_DEFS, all_settings, set_setting
+from .services.settings_store import SETTING_DEFS, all_settings, get_setting, set_setting
+from .services.stats import queue_info
 from .services.status import human_duration, human_size, modem_rows, system_status
 from .services.webhook import send_webhook
 from .timeutil import fmt, local_day, local_month, now_utc
@@ -484,32 +485,78 @@ def message_cancel(mid: int, request: Request, db: Session = Depends(get_db), _=
     return redirect(request.headers.get("referer") or "/admin/messages")
 
 
-# ---------------------------------------------------------------- test SMS
-@router.get("/send", response_class=HTMLResponse)
-def send_page(request: Request, _=Depends(require_admin)):
-    return render(request, "send.html", "send")
+# ---------------------------------------------------------------- SMS yuborish (admin)
+MAX_BATCH = 100
 
 
-@router.post("/send")
-def send_submit(
-    request: Request,
-    to: str = Form(...),
-    text: str = Form(...),
-    db: Session = Depends(get_db),
-    _=Depends(require_admin),
-    __=Depends(csrf_protect),
-):
+def _admin_project(db: Session) -> Project:
     p = db.scalar(select(Project).where(Project.name == ADMIN_TEST_PROJECT))
     if p is None:
         _, key_hash, prefix = new_api_key()
         p = Project(name=ADMIN_TEST_PROJECT, api_key_hash=key_hash, key_prefix=prefix)
         db.add(p)
         db.commit()
-    try:
-        msg, _dup = create_message(db, p, to, text, None)
-        flash(request, "ok", f"Navbatga qo'yildi: #{msg.id}, {msg.parts} qism, kodlash: {msg.encoding}")
-    except ApiError as e:
-        flash(request, "err", e.message)
+    return p
+
+
+def _parse_numbers(raw: str) -> list[str]:
+    seen, out = set(), []
+    for token in re.split(r"[\s,;]+", raw or ""):
+        if token and token not in seen:
+            seen.add(token)
+            out.append(token)
+    return out
+
+
+@router.get("/send", response_class=HTMLResponse)
+def send_page(request: Request, db: Session = Depends(get_db), _=Depends(require_admin)):
+    _admin_project(db)
+    projects = list(db.scalars(select(Project).where(Project.is_active == True).order_by(Project.name)))  # noqa: E712
+    q = queue_info(db)
+    return render(
+        request, "send.html", "send",
+        projects=projects, admin_project=ADMIN_TEST_PROJECT, queue_size=q["size"],
+        interval=get_setting(db, "send_interval_seconds"), max_batch=MAX_BATCH,
+    )
+
+
+@router.post("/send")
+def send_submit(
+    request: Request,
+    numbers: str = Form(...),
+    text: str = Form(...),
+    project_id: int = Form(0),
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+    __=Depends(csrf_protect),
+):
+    p = db.get(Project, project_id) if project_id else None
+    if p is None:
+        p = _admin_project(db)
+    nums = _parse_numbers(numbers)
+    if not nums:
+        flash(request, "err", "Telefon raqam kiritilmadi")
+        return redirect("/admin/send")
+    if len(nums) > MAX_BATCH:
+        flash(request, "err", f"Bir martada ko'pi bilan {MAX_BATCH} ta raqam")
+        return redirect("/admin/send")
+    queued, errors, parts = [], [], 0
+    for n in nums:
+        try:
+            msg, _dup = create_message(db, p, n, text, None)
+            queued.append(msg.id)
+            parts += msg.parts
+        except ApiError as e:
+            errors.append(f"{n}: {e.message}")
+            if e.code in ("no_modem", "quota_exceeded", "project_disabled", "empty_text", "text_too_long"):
+                break  # qolganlari ham xuddi shu sababdan o'tmaydi
+    if queued:
+        interval = get_setting(db, "send_interval_seconds")
+        eta = int(queue_info(db)["size"] * interval)
+        flash(request, "ok", f"{len(queued)} ta SMS navbatga qo'yildi ({p.name}). Hammasi yuborilishi taxminan {human_duration(eta)} oladi.")
+    if errors:
+        shown = "; ".join(errors[:5]) + (f" … (yana {len(errors) - 5} ta xato)" if len(errors) > 5 else "")
+        flash(request, "err", f"Qo'yilmadi: {shown}")
     return redirect("/admin/send")
 
 

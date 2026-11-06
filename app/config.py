@@ -20,14 +20,11 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # HTTPS (Cloudflare) orqali ishlaganda True qiling
     enable_docs: bool = False  # /docs (Swagger) sahifasi
 
-    # Modem rejimi: auto = haqiqiy USB modemlarni qidiradi, mock = soxta modem (sinov uchun)
-    modem_mode: str = "auto"
-    mock_modems: int = 1
-    mock_delay: float = 1.0
-    mock_fail_rate: float = 0.0
+    # Modemlar har doim haqiqiy USB qurilmalardan avtomatik qidiriladi
     scan_interval: int = 15
     serial_baudrate: int = 115200
     serial_ports: str = ""  # qo'lda port ro'yxati, vergul bilan (masalan: /dev/ttyUSB2). Bo'sh = avto
+    serial_exclude: str = ""  # tegilmasin: boshqa dastur ishlatadigan portlar (masalan: /dev/ttyUSB0)
 
     @property
     def data_path(self) -> Path:

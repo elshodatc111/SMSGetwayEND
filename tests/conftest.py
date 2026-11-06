@@ -4,9 +4,7 @@ import tempfile
 _tmp = tempfile.mkdtemp(prefix="smsgw_")
 os.environ.update(
     DATA_DIR=_tmp,
-    MODEM_MODE="mock",
-    MOCK_MODEMS="1",
-    MOCK_DELAY="0.05",
+    SERIAL_PORTS="/dev/null-yoq",  # testda haqiqiy portlar skanerlanmaydi
     ADMIN_USERNAME="admin",
     ADMIN_PASSWORD="testpass123",
     SCAN_INTERVAL="1",
@@ -21,6 +19,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.database import SessionLocal
+from app.runtime import get_runtime
+from tests.mock_modem import MockModem
 from app.models import Project
 from app.security import new_api_key
 from app.services.settings_store import set_setting
@@ -29,6 +29,8 @@ from app.services.settings_store import set_setting
 @pytest.fixture(scope="session")
 def client():
     with TestClient(app) as c:
+        # haqiqiy modem yo'q: testlar uchun soxta modem qo'shiladi (faqat shu yerda)
+        get_runtime().pool.attach(MockModem(1, delay=0.05))
         # modem sinxronlashini kutish
         for _ in range(50):
             r = c.get("/health")
@@ -58,8 +60,8 @@ def relaxed_rate_limits(client):
         if client.get("/health").json().get("queue", 0) == 0:
             break
         time.sleep(0.1)
-    time.sleep(0.6)  # modem pauzasi (send_interval)
     with SessionLocal() as db:
+        set_setting(db, "send_interval_seconds", 0)
         set_setting(db, "rate_per_minute", 0)
         set_setting(db, "rate_per_hour", 0)
         db.commit()

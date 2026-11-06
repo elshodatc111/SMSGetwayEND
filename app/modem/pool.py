@@ -14,7 +14,6 @@ from ..services.settings_store import get_setting
 from ..timeutil import now_utc
 from .at_modem import ATModem
 from .base import BaseModem, ModemError, parse_quota
-from .mock import MockModem
 
 log = logging.getLogger("pool")
 
@@ -86,6 +85,13 @@ class ModemPool:
             for m in self.modems.values():
                 m.close()
 
+    def attach(self, modem: BaseModem) -> None:
+        """Tayyor modem obyektini qo'shadi (avtomatik testlar uchun)."""
+        info = modem.probe()
+        with self._lock:
+            self.modems[info.imei] = modem
+        self._sync_db()
+
     def request_scan(self) -> None:
         self._scan_evt.set()
 
@@ -102,13 +108,15 @@ class ModemPool:
     # ---------- skanerlash ----------
     def _candidate_ports(self) -> list[str]:
         if self.cfg.serial_ports.strip():
-            return [p.strip() for p in self.cfg.serial_ports.split(",") if p.strip()]
-        if sys.platform.startswith("linux"):
+            ports = [p.strip() for p in self.cfg.serial_ports.split(",") if p.strip()]
+        elif sys.platform.startswith("linux"):
             ports = sorted(glob.glob("/dev/ttyUSB*")) + sorted(glob.glob("/dev/ttyACM*"))
-            return ports
-        from serial.tools import list_ports
+        else:
+            from serial.tools import list_ports
 
-        return [p.device for p in list_ports.comports()]
+            ports = [p.device for p in list_ports.comports()]
+        skip = {p.strip() for p in self.cfg.serial_exclude.split(",") if p.strip()}
+        return [p for p in ports if p not in skip]
 
     def scan_once(self) -> None:
         notes = []
@@ -132,37 +140,29 @@ class ModemPool:
                 self.release(imei)
 
         # 2) yangi modemlarni topish
-        if self.cfg.modem_mode == "mock":
-            for i in range(1, max(0, self.cfg.mock_modems) + 1):
-                mm = MockModem(i, self.cfg.mock_delay, self.cfg.mock_fail_rate)
-                with self._lock:
-                    if mm.imei not in self.modems:
-                        self.modems[mm.imei] = mm
-            notes.append(f"mock rejimi: {self.cfg.mock_modems} ta")
-        else:
-            known_ports = {m.port for m in self.modems.values()}
-            now = time.monotonic()
-            ports = self._candidate_ports()
-            notes.append(f"portlar: {', '.join(ports) if ports else 'topilmadi'}")
-            for port in ports:
-                if port in known_ports or self._bad_ports.get(port, 0) > now:
-                    continue
-                modem = ATModem(port, self.cfg.serial_baudrate)
-                try:
-                    info = modem.probe()
-                except Exception as e:
-                    self._bad_ports[port] = now + 30
-                    log.debug("Port %s modem emas: %s", port, e)
-                    continue
-                with self._lock:
-                    dup = info.imei in self.modems
-                    if not dup:
-                        self.modems[info.imei] = modem
-                if dup:
-                    modem.close()
-                    self._bad_ports[port] = now + 600  # shu modemning ikkinchi porti
-                else:
-                    log.info("Modem topildi: %s (%s) %s", info.imei, port, info.operator)
+        known_ports = {m.port for m in self.modems.values()}
+        now = time.monotonic()
+        ports = self._candidate_ports()
+        notes.append(f"portlar: {', '.join(ports) if ports else 'topilmadi'}")
+        for port in ports:
+            if port in known_ports or self._bad_ports.get(port, 0) > now:
+                continue
+            modem = ATModem(port, self.cfg.serial_baudrate)
+            try:
+                info = modem.probe()
+            except Exception as e:
+                self._bad_ports[port] = now + 30
+                log.debug("Port %s modem emas: %s", port, e)
+                continue
+            with self._lock:
+                dup = info.imei in self.modems
+                if not dup:
+                    self.modems[info.imei] = modem
+            if dup:
+                modem.close()
+                self._bad_ports[port] = now + 600  # shu modemning ikkinchi porti
+            else:
+                log.info("Modem topildi: %s (%s) %s", info.imei, port, info.operator)
 
         self._sync_db()
         self._refresh_quotas()

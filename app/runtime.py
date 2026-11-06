@@ -3,8 +3,11 @@ import logging
 import threading
 import time
 
+from sqlalchemy import select, update
+
 from .config import Settings
 from .database import SessionLocal
+from .models import Message, Modem
 from .modem.pool import ModemPool
 from .services.dispatcher import Dispatcher
 from .services.messaging import cleanup_old, recover_stuck
@@ -24,7 +27,21 @@ class Runtime:
         self._janitor = threading.Thread(target=self._janitor_loop, name="janitor", daemon=True)
         self.janitor_heartbeat = 0.0
 
+    @staticmethod
+    def _drop_legacy_mock_modems() -> None:
+        """Avvalgi versiyalardagi soxta (mock) modem yozuvlarini bazadan tozalaydi."""
+        with SessionLocal() as db:
+            ids = list(db.scalars(select(Modem.id).where(Modem.is_mock == True)))  # noqa: E712
+            if not ids:
+                return
+            db.execute(update(Message).where(Message.modem_id.in_(ids)).values(modem_id=None))
+            for row in db.scalars(select(Modem).where(Modem.id.in_(ids))):
+                db.delete(row)
+            db.commit()
+            log.info("%s ta eski soxta modem yozuvi o'chirildi", len(ids))
+
     def start(self) -> None:
+        self._drop_legacy_mock_modems()
         with SessionLocal() as db:
             n = recover_stuck(db)
             if n:

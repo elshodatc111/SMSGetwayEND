@@ -65,8 +65,8 @@ def test_modem_pages_and_at_console(admin):
 
 def test_send_test_sms_and_journal(admin):
     tok = csrf_of(admin)
-    r = admin.post("/admin/send", data={"csrf_token": tok, "to": "+998909998877", "text": "Sinov"}, follow_redirects=True)
-    assert "Navbatga qo&#39;yildi" in r.text or "Navbatga qo'yildi" in r.text
+    r = admin.post("/admin/send", data={"csrf_token": tok, "numbers": "+998909998877", "text": "Sinov", "project_id": "0"}, follow_redirects=True)
+    assert "1 ta SMS navbatga" in r.text
     j = admin.get("/admin/messages?q=909998877")
     assert j.status_code == 200 and "+998909998877" in j.text
     c = admin.get("/admin/messages.csv?q=909998877")
@@ -75,7 +75,16 @@ def test_send_test_sms_and_journal(admin):
 
 def test_settings_and_password(admin):
     tok = csrf_of(admin)
-    r = admin.post("/admin/settings", data={"csrf_token": tok, "rate_per_minute": "0", "rate_per_hour": "0", "message_ttl_seconds": "300", "max_attempts": "3", "retry_delay_seconds": "15", "send_interval_ms": "100", "log_retention_days": "90", "ussd_refresh_minutes": "360", "max_parts": "6", "normalize_apostrophes": "on", "mask_text": "on"}, follow_redirects=True)
+    r = admin.post("/admin/settings", data={"csrf_token": tok, "rate_per_minute": "0", "rate_per_hour": "0", "message_ttl_seconds": "900", "max_attempts": "3", "retry_delay_seconds": "15", "send_interval_seconds": "0", "log_retention_days": "90", "ussd_refresh_minutes": "360", "max_parts": "6", "normalize_apostrophes": "on", "mask_text": "on"}, follow_redirects=True)
     assert "Sozlamalar saqlandi" in r.text
     r = admin.post("/admin/settings/password", data={"csrf_token": tok, "current": "bad", "new": "newpassword1", "repeat": "newpassword1"}, follow_redirects=True)
     assert "noto&#39;g&#39;ri" in r.text or "noto'g'ri" in r.text
+
+
+def test_admin_batch_send(admin):
+    """Bir nechta raqam: takror raqam bir marta, noto'g'ri raqam xato sifatida ko'rsatiladi."""
+    tok = csrf_of(admin)
+    data = {"csrf_token": tok, "numbers": "+998900000101, +998900000102\n+998900000101 12345", "text": "Ommaviy", "project_id": "0"}
+    r = admin.post("/admin/send", data=data, follow_redirects=True)
+    assert "2 ta SMS navbatga" in r.text
+    assert "Qo&#39;yilmadi" in r.text or "Qo'yilmadi" in r.text  # 12345 noto'g'ri raqam

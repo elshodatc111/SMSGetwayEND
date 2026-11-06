@@ -10,25 +10,25 @@ USB modem (AT buyruqlar) orqali SMS yuboruvchi shaxsiy API xizmati. **Python · 
 - Modem uchun oylik SMS paketi limiti + **USSD orqali qoldiqni avtomatik o'qish**
 - Har SMS jurnali (CSV eksport), OTP raqamlarini jurnalda yashirish
 - Webhook (HMAC imzo bilan) va `GET /sms/{id}` orqali natijani olish
-- Admin panel (o'zbekcha, yorug'/qorong'i): dashboard, tizim holati, loyihalar, modemlar, jurnal, test SMS, sozlamalar, AT-konsol
-- Modemsiz sinash uchun **mock rejimi**
+- Admin panel (o'zbekcha, yorug'/qorong'i): dashboard, tizim holati, loyihalar, modemlar, jurnal, SMS yuborish (bir yoki bir nechta raqamga), sozlamalar, AT-konsol
+- Faqat **haqiqiy USB modemlar**; SMSlar navbat bilan, bittadan, har biridan keyin **5 soniya** pauza (Sozlamalarda o'zgaradi)
 
 ---
 
-## 1. Kompyuterda (Windows) sinash, modemsiz
+## 1. Kompyuterda (Windows) ochib ko'rish
 
 ```bat
 cd C:\PythonLoyhalar\SMSGetway
 run_dev.bat
 ```
 
-`run_dev.bat` virtual muhit yaratadi, kutubxonalarni o'rnatadi, `.env` ni `MODEM_MODE=mock` bilan yaratadi va serverni ishga tushiradi.
+`run_dev.bat` virtual muhit yaratadi, kutubxonalarni o'rnatadi, `.env` yaratadi va serverni ishga tushiradi. USB modem ulangan bo'lsa u avtomatik topiladi, ulanmagan bo'lsa panel baribir ochiladi (Modemlar sahifasida "Modem topilmadi" chiqadi).
 
 - Admin panel: <http://127.0.0.1:8000/admin>, login `admin`, parol: `.env` dagi `ADMIN_PASSWORD` (`ozgartiring-12345`)
-- API hujjati (Swagger): <http://127.0.0.1:8000/docs>
+- API hujjati (Swagger): <http://127.0.0.1:8000/docs> (`.env` da `ENABLE_DOCS=true` bo'lsa)
 - Testlar: `.venv\Scripts\activate` → `pytest`
 
-Panelda: **Loyihalar → Yangi loyiha** (API kalit bir marta ko'rsatiladi) → **Test SMS** yoki `curl` bilan yuboring. Mock rejimda SMS haqiqatda ketmaydi, faqat jarayon sinaladi.
+Panelda: **Loyihalar → Yangi loyiha** (API kalit bir marta ko'rsatiladi) → **SMS yuborish** yoki `curl` bilan yuboring. Haqiqiy SMS faqat modem ulangan bo'lsa ketadi.
 
 ## 2. Serverga o'rnatish (uydagi Ubuntu server, 192.168.100.38)
 
@@ -39,7 +39,7 @@ GitHub'ga yuklagach:
 git clone https://github.com/<foydalanuvchi>/<repo>.git sms_gateway
 cd sms_gateway
 cp .env.example .env
-nano .env          # ADMIN_PASSWORD ni o'zgartiring, MODEM_MODE=auto qoldiring
+nano .env          # ADMIN_PASSWORD, COOKIE_SECURE=true, HTTP_PORT; boshqa dastur modemi bo'lsa SERIAL_EXCLUDE
 
 # 2) ModemManager (Ubuntu'da modemni band qilib qo'yadi) ni o'chiring
 sudo systemctl disable --now ModemManager
@@ -127,7 +127,7 @@ Sarlavhalar: `X-SMS-Timestamp`, `X-SMS-Signature: sha256=HMAC_SHA256(secret, tim
 - **Apostrof avtomatik tuzatiladi:** `ʻ ’ ‘ ´` oddiy `'` ga almashtiriladi (SMS qisqa va arzon bo'ladi). Sozlamalarda o'chirish mumkin.
 - **Modem paketi:** Modem sahifasida "Oylik SMS paketi" kiriting. Hisob har oyning 1-sanasida (Toshkent vaqti) noldan boshlanadi. Paket tugasa, shu modem orqali yuborilmaydi; boshqa modem bo'lsa xabar unga o'tadi.
 - **Loyiha limiti:** har loyihaga ixtiyoriy kunlik/oylik limit.
-- Navbatdagi xabar `Navbatda kutish muddati` (standart 5 daqiqa) ichida modem/limit topilmasa `expired` bo'ladi.
+- Navbatdagi xabar `Navbatda kutish muddati` (standart 15 daqiqa) ichida modem/limit topilmasa `expired` bo'ladi.
 
 ### USSD orqali paket qoldig'ini avtomatik o'qish
 
@@ -144,7 +144,7 @@ Har yuborilgan SMS qoldiqni darhol kamaytiradi, USSD esa uni haqiqiy qiymatga tu
 1. `lsusb` va `ls /dev/ttyUSB*`: modem va portlar ko'rinadimi?
 2. Panel → **Modemlar**: modem "tayyor", operator va signal ko'rinadimi? (IMEI, operator nomi AT orqali o'qiladi.)
 3. Modem sahifasidagi **AT konsol**: `AT+CGMM` (model), `AT+CPIN?` (`READY` bo'lishi kerak), `AT+CSQ`, `AT+COPS?`.
-4. **Test SMS** → o'z raqamingizga yuboring. Jurnalda holat `Yuborildi`.
+4. **SMS yuborish** → o'z raqamingizga yuboring. Jurnalda holat `Yuborildi`.
 5. USSD kodini kiriting va qoldiq o'qilishini tekshiring.
 6. Muammo bo'lsa menga yuboring: `lsusb`, `ls -l /dev/ttyUSB*`, `docker compose logs --tail=100 app`, AT konsol natijasi (`AT+CGMM`, `AT+CPIN?`).
 
@@ -159,11 +159,11 @@ app/
   admin.py         admin panel marshrutlari
   models.py        SQLite jadvallari
   runtime.py       fon xizmatlari (modem skaneri, dispatcher, webhook, tozalash)
-  modem/           at_modem.py (AT/PDU/USSD), mock.py, pool.py (avto topish)
+  modem/           at_modem.py (AT/PDU/USSD), pool.py (avto topish)
   services/        gsm.py (kodlash), messaging.py, dispatcher.py, webhook.py, stats.py, settings_store.py
   templates/, static/
 clients/           Laravel va Python klientlari
-tests/             pytest (GSM/PDU, soxta AT-modem, API, admin)
+tests/             pytest (GSM/PDU, soxta AT-modem, API, admin; soxta modem faqat shu yerda)
 ```
 
 Ma'lumotlar `data/` papkasida (`sms_gateway.db`, `secret.key`). Zaxira nusxa uchun shu papkani nusxalash kifoya.
@@ -171,8 +171,6 @@ Ma'lumotlar `data/` papkasida (`sms_gateway.db`, `secret.key`). Zaxira nusxa uch
 ## 8. Ma'lum cheklovlar
 
 - Kiruvchi SMS va yetkazib berish hisoboti (delivery report) yo'q. `sent` = modem operatorga qabul qilganini tasdiqladi.
-- Bir vaqtda bitta SMS/modem (bir SMS ~2–10 soniya). Kuniga 20–30 SMS uchun ortig'i bilan yetarli.
+- SMSlar global navbat bilan yuboriladi: bir vaqtda bitta, har biridan keyin 5 soniya pauza (Sozlamalar → "SMSlar orasidagi pauza"). Bir minutda ~8–10 ta SMS.
 - USSD javob formati operator va modemga qarab farq qiladi, shuning uchun birinchi ulashda regex moslash kerak bo'lishi mumkin.
 - Server qayta ishga tushganda yuborilayotgan (`sending`) xabar natijasi noma'lum bo'lgani uchun `failed` deb belgilanadi (takror SMS yubormaslik uchun).
-#   S M S G e t w a y E N D  
- 

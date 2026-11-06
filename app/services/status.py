@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..config import VERSION, get_settings
 from ..models import Message, Modem
 from ..runtime import get_runtime
+from .settings_store import get_setting
 from .stats import modem_remaining, queue_info
 
 
@@ -28,7 +29,6 @@ def modem_rows(db: Session) -> list[dict]:
 
 def health(db: Session) -> dict:
     rt = get_runtime()
-    cfg = get_settings()
     rows = modem_rows(db)
     usable = [r for r in rows if r["row"].is_enabled and r["row"].is_online and (r["remaining"] is None or r["remaining"] > 0)]
     workers = rt.workers()
@@ -45,7 +45,6 @@ def health(db: Session) -> dict:
         "modems_usable": len(usable),
         "queue": q["size"],
         "version": VERSION,
-        "mode": cfg.modem_mode,
     }
 
 
@@ -72,6 +71,7 @@ def system_status(db: Session) -> dict:
         "last_scan": rt.pool.last_scan,
         "last_scan_note": rt.pool.last_scan_note,
         "busy_modems": rt.pool.busy_count(),
+        "send_interval": get_setting(db, "send_interval_seconds"),
         "timezone": cfg.timezone,
         "modems": modem_rows(db),
     }

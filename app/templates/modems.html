@@ -7,7 +7,7 @@
 <div class="card">
   <div class="row" style="align-items:center">
     <div>
-      Rejim: <b>{{ 'MOCK (soxta)' if cfg.modem_mode == 'mock' else 'Haqiqiy USB modem (avto qidirish)' }}</b>
+      USB modemlar <b>avtomatik</b> qidiriladi
       · oxirgi skanerlash: {{ fmt(last_scan) }}<div class="hint">{{ note }}</div>
     </div>
     <form method="post" action="/admin/modems/rescan" class="shrink"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="btn primary">🔄 Qayta skanerlash</button></form>
@@ -20,7 +20,7 @@
     <tbody>
     {% for r in modems %}
       <tr>
-        <td><b>{{ r.row.label or ('Modem #' ~ r.row.id) }}</b>{% if r.row.is_mock %} <span class="badge info">mock</span>{% endif %}</td>
+        <td><b>{{ r.row.label or ('Modem #' ~ r.row.id) }}</b></td>
         <td class="mono">{{ r.row.imei }}</td><td class="mono">{{ r.row.port }}</td>
         <td>{{ r.row.operator or '—' }}<div class="muted mono">{{ r.row.sim_number }}</div></td>
         <td>{{ signal(r.row.signal) }}</td>

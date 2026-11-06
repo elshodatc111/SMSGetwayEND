@@ -11,7 +11,7 @@
         <tr><td>Holat</td><td><span class="dot {{ 'ok' if st.status == 'ok' else ('warn' if st.status == 'degraded' else 'err') }}"></span><b>{{ {'ok':'Ishlayapti','degraded':'Cheklangan (tayyor modem yo\'q)','down':'To\'xtagan (fon xizmati ishlamayapti)'}[st.status] }}</b></td></tr>
         <tr><td>Versiya</td><td>{{ VERSION }}</td></tr>
         <tr><td>Ishlash vaqti (uptime)</td><td>{{ human_duration(st.uptime_seconds) }}</td></tr>
-        <tr><td>Modem rejimi</td><td>{{ 'MOCK (soxta modem, sinov)' if st.mode == 'mock' else 'Haqiqiy USB modem (avto)' }}</td></tr>
+        <tr><td>SMSlar orasidagi pauza</td><td>{{ st.send_interval }} soniya (navbat bilan, bittadan)</td></tr>
         <tr><td>Vaqt mintaqasi</td><td>{{ st.timezone }}</td></tr>
         <tr><td>Ma'lumotlar bazasi</td><td>{{ human_size(st.db_size) }} · {{ st.total_messages }} ta xabar</td></tr>
       </table>
@@ -35,7 +35,7 @@
       <tbody>
       {% for r in st.modems %}
         <tr>
-          <td><a href="/admin/modems/{{ r.row.id }}">{{ r.row.label or r.row.imei }}</a>{% if r.row.is_mock %} <span class="badge info">mock</span>{% endif %}</td>
+          <td><a href="/admin/modems/{{ r.row.id }}">{{ r.row.label or r.row.imei }}</a></td>
           <td class="mono">{{ r.row.port }}</td><td>{{ r.row.operator or '—' }}</td><td>{{ signal(r.row.signal) }}</td>
           <td>{% if not r.row.is_enabled %}<span class="badge muted">o'chirilgan</span>{% elif not r.row.is_online %}<span class="badge err">uzilgan</span>{% elif not r.row.registered %}<span class="badge warn">tarmoqda emas</span>{% elif r.busy %}<span class="badge info">yuboryapti</span>{% else %}<span class="badge ok">tayyor</span>{% endif %}</td>
           <td class="num">{{ r.remaining if r.remaining is not none else '∞' }}</td><td>{{ fmt(r.row.last_seen_at) }}</td>

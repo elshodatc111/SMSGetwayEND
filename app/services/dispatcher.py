@@ -25,9 +25,12 @@ class Dispatcher(threading.Thread):
         super().__init__(name="dispatcher", daemon=True)
         self.pool = pool
         self._stop_evt = threading.Event()
-        self._executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="send")
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="send")
         self._last_expire = 0.0
         self.heartbeat = 0.0
+        # Navbat bilan yuborish: bir vaqtda bitta SMS, har biridan keyin pauza
+        self._in_flight = threading.Event()
+        self._next_at = 0.0  # time.monotonic(): keyingi SMS shundan oldin boshlanmaydi
 
     def stop(self) -> None:
         self._stop_evt.set()
@@ -42,7 +45,7 @@ class Dispatcher(threading.Thread):
             except Exception:
                 log.exception("Dispatcher xatosi")
             if not did:
-                self._stop_evt.wait(0.5)
+                self._stop_evt.wait(0.25)
 
     def _tick(self) -> bool:
         with SessionLocal() as db:
@@ -50,6 +53,8 @@ class Dispatcher(threading.Thread):
                 self._last_expire = time.monotonic()
                 expire_old(db)
 
+            if self._in_flight.is_set() or time.monotonic() < self._next_at:
+                return False
             idle = self.pool.idle()
             if not idle:
                 return False
@@ -82,19 +87,20 @@ class Dispatcher(threading.Thread):
                 msg.attempts += 1
                 msg.started_at = now
                 db.commit()
+                self._in_flight.set()
                 self._executor.submit(self._deliver, msg.id, modem.imei)
-                did = True
-            return did
+                return True  # faqat bittasi: qolganlari navbatda kutadi
+            return False
 
     def _deliver(self, message_id: int, imei: str) -> None:
-        interval = 0.5
+        interval = 5.0
         try:
             with SessionLocal() as db:
                 msg = db.get(Message, message_id)
                 if msg is None or msg.status != SENDING:
                     return
                 cfg = all_settings(db)
-                interval = cfg["send_interval_ms"] / 1000
+                interval = float(cfg["send_interval_seconds"])
                 modem = self.pool.get(imei)
                 try:
                     if modem is None:
@@ -112,7 +118,8 @@ class Dispatcher(threading.Thread):
                     self._on_failure(db, msg, f"Kutilmagan xato: {e}", 0, cfg)
         finally:
             self.pool.release(imei)
-            time.sleep(max(0.0, interval))
+            self._next_at = time.monotonic() + max(0.0, interval)
+            self._in_flight.clear()
 
     @staticmethod
     def _original_text(msg: Message) -> str:

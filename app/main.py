@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
     runtime = Runtime(cfg)
     rt_mod.runtime = runtime
     runtime.start()
-    log.info("SMS Gateway %s ishga tushdi (modem rejimi: %s)", VERSION, cfg.modem_mode)
+    log.info("SMS Gateway %s ishga tushdi (USB modemlar avtomatik qidiriladi)", VERSION)
     yield
     runtime.stop()
     rt_mod.runtime = None
