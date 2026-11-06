@@ -22,8 +22,14 @@ class ATModem(BaseModem):
         self.lock = threading.RLock()
 
     # ---------- past darajali I/O ----------
-    def open(self) -> None:
-        self.ser = serial.Serial(self.port, self.baudrate, timeout=0.2, write_timeout=5)
+    def open(self, raw_control: bool = False) -> None:
+        """Portni ochadi. raw_control=True bo'lsa DTR/RTS chiziqlariga tegilmaydi
+        (ba'zi ZTE/Huawei usb-serial drayverlari ularni rad etib EPIPE beradi)."""
+        self.close()
+        self.ser = serial.Serial(
+            self.port, self.baudrate, timeout=0.2, write_timeout=5,
+            rtscts=False, xonxoff=False, dsrdtr=bool(raw_control),
+        )
 
     def close(self) -> None:
         try:
@@ -60,8 +66,8 @@ class ATModem(BaseModem):
                 self.ser.reset_input_buffer()
                 self.ser.write((cmd + "\r").encode("latin-1"))
                 raw = self._read_until(self._final_matcher, timeout)
-            except serial.SerialException as e:
-                raise ModemError(f"Port xatosi: {e}") from e
+            except (serial.SerialException, OSError) as e:
+                raise ModemError(f"Port xatosi: {type(e).__name__}: {e}") from e
             m = _FINAL_RE.search(raw)
             if not m:
                 if check:
@@ -136,28 +142,32 @@ class ATModem(BaseModem):
         return info
 
     def probe(self) -> ModemInfo:
-        """Portni ochib AT ga javob berishini tekshiradi va modem ma'lumotini o'qiydi."""
-        try:
-            self.open()
-            ok = False
-            for _ in range(3):
-                try:
-                    self.command("ATE0", 1.5)
-                    ok = True
-                    break
-                except ModemError:
-                    time.sleep(0.2)
-            if not ok:
-                raise ModemError("AT ga javob bermadi")
-            self.command("AT+CMEE=1", 2, check=False)
-            self.info = self._read_info(full=True)
-            return self.info
-        except serial.SerialException as e:
-            self.close()
-            raise ModemError(f"Port ochilmadi: {e}") from e
-        except Exception:
-            self.close()
-            raise
+        """Portni ochib AT ga javob berishini tekshiradi va modem ma'lumotini o'qiydi.
+        Port xatosida (EPIPE va h.k.) portni qayta ochib, boshqa rejim bilan urinadi."""
+        last: Exception | None = None
+        for attempt in range(4):
+            try:
+                self.open(raw_control=attempt % 2 == 1)
+                ok = False
+                for _ in range(3):
+                    try:
+                        self.command("ATE0", 1.5)
+                        ok = True
+                        break
+                    except ModemError as e:
+                        last = e
+                        time.sleep(0.2)
+                if not ok:
+                    raise ModemError(f"AT ga javob bermadi ({last})" if last else "AT ga javob bermadi")
+                self.command("AT+CMEE=1", 2, check=False)
+                self.info = self._read_info(full=True)
+                return self.info
+            except (serial.SerialException, OSError, ModemError) as e:
+                last = e
+                self.close()
+                time.sleep(0.5)
+        self.close()
+        raise ModemError(f"Port ochilmadi: {type(last).__name__}: {last}")
 
     def refresh_status(self) -> ModemInfo:
         with self.lock:
@@ -198,7 +208,7 @@ class ATModem(BaseModem):
                 raise SendError(f"Modem '>' belgisini bermadi: {prompt.strip()[:120]}", 0, fatal=not prompt.strip())
             self.ser.write(pdu.encode() + b"\x1a")
             raw = self._read_until(self._final_matcher, 60)
-        except serial.SerialException as e:
+        except (serial.SerialException, OSError) as e:
             raise SendError(f"Port xatosi: {e}", 0, fatal=True) from e
         m = _FINAL_RE.search(raw)
         if not m:
