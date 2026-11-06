@@ -41,7 +41,18 @@ STATUS_LABELS = {
 }
 WEBHOOK_LABELS = {"none": "—", "pending": "kutilmoqda", "delivered": "yetkazildi", "failed": "xato"}
 
+def _asset_version() -> str:
+    """Statik fayllar o'zgarsa, kesh (Cloudflare/brauzer) yangilanishi uchun versiya."""
+    from pathlib import Path
+    d = Path(__file__).resolve().parent / "static"
+    try:
+        return str(int(max(f.stat().st_mtime for f in d.iterdir() if f.is_file())))
+    except Exception:  # noqa: BLE001
+        return VERSION
+
+
 templates.env.globals.update(
+    ASSET_V=_asset_version(),
     fmt=fmt,
     human_duration=human_duration,
     human_size=human_size,
