@@ -14,6 +14,22 @@ log = logging.getLogger("modem")
 _FINAL_RE = re.compile(r"(?:^|\r\n)(OK|ERROR|NO CARRIER|NO DIALTONE|BUSY|\+CME ERROR:[^\r\n]*|\+CMS ERROR:[^\r\n]*)\r\n", re.S)
 
 
+class _TolerantSerial(serial.Serial):
+    """DTR/RTS ioctl xatolarini (ZTE usb-serial: EPIPE) e'tiborsiz qoldiradigan Serial."""
+
+    def _update_dtr_state(self):
+        try:
+            super()._update_dtr_state()
+        except OSError:
+            pass
+
+    def _update_rts_state(self):
+        try:
+            super()._update_rts_state()
+        except OSError:
+            pass
+
+
 class ATModem(BaseModem):
     def __init__(self, port: str, baudrate: int = 115200):
         super().__init__(port)
@@ -26,7 +42,7 @@ class ATModem(BaseModem):
         """Portni ochadi. raw_control=True bo'lsa DTR/RTS chiziqlariga tegilmaydi
         (ba'zi ZTE/Huawei usb-serial drayverlari ularni rad etib EPIPE beradi)."""
         self.close()
-        self.ser = serial.Serial(
+        self.ser = _TolerantSerial(
             self.port, self.baudrate, timeout=0.2, write_timeout=5,
             rtscts=False, xonxoff=False, dsrdtr=bool(raw_control),
         )
